@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XYZ Meeting Scheduler — Hệ thống quản trị</title>
+<style>
+  :root {
+    --primary: #2563eb; --primary-hover: #1d4ed8;
+    --slate: #64748b; --amber: #f59e0b;
+    --line: #e2e8f0; --bg: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--bg); color: #0f172a; }
+  .login-wrapper { display: flex; min-height: 100vh; align-items: center; justify-content: center; background: #f1f5f9; }
+  .login-card { background: #ffffff; padding: 40px; border-radius: 12px; width: 420px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { display: block; font-size: 14px; margin-bottom: 6px; font-weight: 500; }
+  .form-group input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+  .btn-login { width: 100%; padding: 12px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+
+  .shell { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 260px; background: #fff; border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 20px; }
+  .brand { font-size: 18px; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; font-weight: bold; }
+  .mark { background: var(--primary); color: #fff; padding: 4px 8px; border-radius: 4px; }
+  .nav { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .nav a { text-decoration: none; color: var(--slate); padding: 10px; border-radius: 6px; font-size: 14px; cursor: pointer; display: block; }
+  .nav a.active { background: #eff6ff; color: var(--primary); font-weight: 500; }
+  .role-tag { font-size: 12px; color: var(--slate); padding-top: 15px; border-top: 1px solid var(--line); }
+  .btn-logout { background: none; border: none; color: #ef4444; padding: 5px 0; cursor: pointer; font-weight: 500; }
+  
+  .main { flex: 1; padding: 30px; overflow-y: auto; }
+  .view { display: none; } .view.active { display: block; }
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+  h1 { margin: 0; font-size: 24px; }
+  .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--slate); border: 1px solid var(--line); }
+  .btn-success { background: #10b981; color: #fff; padding: 6px 12px; font-size: 13px; border: none; border-radius: 4px; cursor: pointer; }
+  
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { background: #f8fafc; color: var(--slate); font-weight: 500; }
+  .badge { padding: 4px 8px; border-radius: 20px; font-size: 12px; }
+  .b-emp { background: #f1f5f9; color: #475569; } .b-mgr { background: #e0e7ff; color: #4338ca; } .b-admin { background: #fce7f3; color: #be185d; }
+  .room-status { font-weight: 600; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+  .room-status.trong { background: #d1fae5; color: #065f46; }
+  .room-status.sudung { background: #fee2e2; color: #991b1b; }
+
+  .action-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-weight: 500; margin-right: 10px; }
+  .action-btn.del { color: #ef4444; }
+
+  .booking-box { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid var(--line); margin-bottom: 25px; max-width: 650px; }
+  .booking-box h3 { margin: 0 0 15px 0; font-size: 16px; }
+  .booking-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .booking-form .full { grid-column: span 2; }
+  .booking-form label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--slate); }
+  .booking-form input, .booking-form select { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100;}
+  .overlay.open { display: flex; }
+  .modal { background: #fff; padding: 24px; border-radius: 8px; width: 400px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 500; }
+  .field input, .field select { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<!-- 1. LOGIN SCREEN -->
+<div id="loginScreen" class="login-wrapper">
+  <div class="login-card">
+    <h2>Đăng nhập hệ thống</h2><br>
+    <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="admin@xyzcorp.vn"></div>
+    <div class="form-group"><label>Mật khẩu</label><input type="password" id="loginPwd" placeholder="••••••••"></div>
+    <button class="btn-login" onclick="handleLogin()">Đăng nhập</button>
+  </div>
+</div>
+
+<!-- 2. MAIN SCREEN -->
+<div id="mainScreen" class="shell" style="display: none;">
+  <aside class="sidebar">
+    <div class="brand"><span class="mark">XY</span> XYZ Scheduler</div>
+    <nav class="nav" id="dynamicMenu"></nav>
+    <div class="role-tag">
+      <span id="currentUserName"><b>Loading...</b></span>
+      <span id="currentUserRole" style="display:block;color:var(--slate)">Role</span>
+      <button class="btn-logout" onclick="handleLogout()">🚪 Đăng xuất</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- TAB 1: ACCOUNTS -->
+    <section id="view-accounts" class="view">
+      <div class="topbar">
+        <div><h1>Quản lý tài khoản</h1><p>Quyền Admin tối cao.</p></div>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ Tạo tài khoản mới</button>
+      </div>
+      <table>
+        <thead><tr><th>Họ và tên</th><th>Phòng ban</th><th>Vai trò</th><th>Thao tác</th></tr></thead>
+        <tbody id="tbody-accounts"></tbody>
+      </table>
+    </section>
+
+    <!-- TAB 2: MEETINGS GIÁM SÁT (BỔ SUNG NÚT KẾT THÚC SỚM) -->
+    <section id="view-meetings" class="view">
+      <div class="topbar">
+        <div><h1>Giám sát đặt phòng họp</h1><p>Xác nhận kết thúc sớm để giải phóng phòng họp ngay lập tức.</p></div>
+      </div>
+      <table>
+        <thead><tr><th>Tên cuộc họp</th><th>Người đặt lịch</th><th>Phòng họp</th><th>Thời gian</th><th>Thao tác</th></tr></thead>
+        <tbody id="tbody-meetings"></tbody>
+      </table>
+    </section>
+
+    <!-- TAB 3: ROOMS -->
+    <section id="view-rooms" class="view">
+      <div class="topbar">
+        <div><h1>Trạng thái & Đặt phòng họp</h1><p>Kiểm tra tình trạng phòng theo thời gian thực.</p></div>
+      </div>
+      
+      <div class="booking-box">
+        <h3>📅 Form Đăng Ký Đặt Phòng Họp</h3>
+        <div class="booking-form">
+          <div class="full"><label>Tên cuộc họp</label><input type="text" id="meetTitle" placeholder="Nhập tiêu đề..."></div>
+          <div class="full">
+            <label>Chọn phòng</label>
+            <select id="meetRoomSelect">
+              <option value="Phòng Họp A (Lớn)">Phòng Họp A (Lớn)</option>
+              <option value="Phòng Họp B (Vừa)">Phòng Họp B (Vừa)</option>
+              <option value="Phòng Họp C (Nhỏ)">Phòng Họp C (Nhỏ)</option>
+            </select>
+          </div>
+          <div><label>Bắt đầu</label><input type="datetime-local" id="meetStart"></div>
+          <div><label>Kết thúc</label><input type="datetime-local" id="meetEnd"></div>
+          <div class="full" style="margin-top: 5px;"><button class="btn btn-primary" style="width:100%" onclick="submitBooking()">Xác nhận đặt lịch</button></div>
+        </div>
+      </div>
+
+      <table>
+        <thead><tr><th>Tên phòng họp</th><th>Sức chứa</th><th>Tình trạng (Hiện tại)</th><th>Người giữ phòng</th></tr></thead>
+        <tbody id="tbody-rooms"></tbody>
+      </table>
+    </section>
+  </main>
+</div>
+
+<!-- Modal Tạo/Sửa Tài Khoản -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modalTitle">Tạo tài khoản mới</h3>
+    <input type="hidden" id="editUserId">
+    <div class="field"><label>Họ và tên</label><input id="newName"></div>
+    <div class="field" id="emailFieldGroup"><label>Email tài khoản</label><input id="newEmail" type="email"></div>
+    <div class="field"><label>Phòng ban</label><input id="newDept"></div>
+    <div class="field"><label>Vai trò</label>
+      <select id="newRole">
+        <option value="Employee">Employee</option>
+        <option value="Meeting Manager">Meeting Manager</option>
+        <option value="Administrator">Administrator</option>
+      </select>
+    </div>
+    <div class="field" id="passwordFieldGroup"><label>Mật khẩu khởi tạo *</label><input type="password" id="newPwd"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Hủy</button>
+      <button class="btn btn-primary" id="btnSubmit" onclick="saveAccountAction()">Xác nhận lưu</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+let isEditMode = false;
+
+async function handleLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPwd').value;
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const result = await response.json();
+    if(!response.ok) return alert(result.error);
+
+    currentUser = result.user;
+    document.getElementById('currentUserName').innerHTML = `<b>${currentUser.name}</b>`;
+    document.getElementById('currentUserRole').innerText = currentUser.role;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display = 'flex';
+
+    setupMenuAndViews();
+    
+    // Tự động làm mới bảng trạng thái phòng mỗi 5 giây để cập nhật trạng thái thực tế
+    setInterval(() => {
+      if(document.getElementById('view-rooms').classList.contains('active')) loadRoomsData();
+    }, 5000);
+
+  } catch (error) { alert("Lỗi kết nối."); }
+}
+
+function setupMenuAndViews() {
+  const menuNav = document.getElementById('dynamicMenu');
+  let menuHTML = '';
+  let defaultView = '';
+
+  if (currentUser.role === 'Administrator') {
+    menuHTML += `<a onclick="switchView('view-accounts')" id="btn-view-accounts">🧑‍💼 &nbsp;Quản lý tài khoản</a>`;
+    menuHTML += `<a onclick="switchView('view-meetings')" id="btn-view-meetings">📊 &nbsp;Giám sát lịch họp</a>`;
+    menuHTML += `<a onclick="switchView('view-rooms')" id="btn-view-rooms">🏢 &nbsp;Trạng thái phòng</a>`;
+    defaultView = 'view-accounts';
+  } else if (currentUser.role === 'Meeting Manager') {
+    menuHTML += `<a onclick="switchView('view-meetings')" id="btn-view-meetings">📊 &nbsp;Giám sát lịch họp</a>`;
+    menuHTML += `<a onclick="switchView('view-rooms')" id="btn-view-rooms">🏢 &nbsp;Trạng thái phòng</a>`;
+    defaultView = 'view-meetings';
+  } else {
+    menuHTML += `<a onclick="switchView('view-rooms')" id="btn-view-rooms">🏢 &nbsp;Trạng thái phòng</a>`;
+    defaultView = 'view-rooms';
+  }
+  menuNav.innerHTML = menuHTML;
+  switchView(defaultView);
+}
+
+function switchView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById(viewId).classList.add('active');
+  const activeBtn = document.getElementById('btn-' + viewId);
+  if(activeBtn) activeBtn.classList.add('active');
+
+  if (viewId === 'view-accounts') loadAccountsData();
+  if (viewId === 'view-meetings') loadMeetingsData();
+  if (viewId === 'view-rooms') loadRoomsData();
+}
+
+function formatDateTime(isoString) {
+  const d = new Date(isoString);
+  const dateStr = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${timeStr} - ${dateStr}`;
+}
+
+// TẢI LỊCH HỌP KÈM NÚT XỬ LÝ KẾT THÚC SỚM
+async function loadMeetingsData() {
+  const res = await fetch('/api/meetings', { headers: { 'x-user-role': currentUser.role } });
+  const data = await res.json();
+  
+  const now = new Date();
+
+  document.getElementById('tbody-meetings').innerHTML = data.map(m => {
+    const isPast = now > new Date(m.endTime);
+    // Chỉ hiển thị nút Kết thúc sớm nếu cuộc họp đang hoặc sắp diễn ra (chưa kết thúc)
+    const actionButton = isPast ? 
+      `<span style="color:var(--slate);font-style:italic">Đã kết thúc</span>` : 
+      `<button class="btn-success" onclick="finishMeetingEarly(${m.id})">✓ Kết thúc sớm</button>`;
+
+    return `
+      <tr>
+        <td><b>${m.title}</b></td>
+        <td>${m.organizer}</td>
+        <td>${m.room}</td>
+        <td>Từ: <code>${formatDateTime(m.startTime)}</code><br>Đến: <code>${formatDateTime(m.endTime)}</code></td>
+        <td>${actionButton}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// GỌI API KẾT THÚC SỚM
+async function finishMeetingEarly(id) {
+  if(!confirm("Xác nhận cuộc họp này đã kết thúc để giải phóng phòng trống ngay lập tức?")) return;
+  
+  try {
+    const res = await fetch(`/api/meetings/${id}/finish`, {
+      method: 'POST',
+      headers: { 'x-user-role': currentUser.role }
+    });
+    const result = await res.json();
+    alert(result.message);
+    loadMeetingsData(); // Tải lại bảng giám sát lịch họp
+  } catch (error) {
+    alert("Không thể thực hiện.");
+  }
+}
+
+// TẢI DỮ LIỆU PHÒNG HỌP
+async function loadRoomsData() {
+  const res = await fetch('/api/rooms');
+  const data = await res.json();
+  document.getElementById('tbody-rooms').innerHTML = data.map(r => `
+    <tr>
+      <td><b>${r.name}</b></td>
+      <td>${r.capacity} người</td>
+      <td><span class="room-status ${r.status==='Trống'?'trong':'sudung'}">${r.status}</span></td>
+      <td><span style="color:var(--slate)">${r.organizer}</span></td>
+    </tr>
+  `).join('');
+}
+
+// ĐẶT LỊCH PHÒNG
+async function submitBooking() {
+  const title = document.getElementById('meetTitle').value;
+  const roomName = document.getElementById('meetRoomSelect').value;
+  const startTime = document.getElementById('meetStart').value;
+  const endTime = document.getElementById('meetEnd').value;
+
+  if(!title.trim() || !startTime || !endTime) return alert("Vui lòng nhập đủ thông tin!");
+
+  const res = await fetch('/api/meetings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, roomName, startTime, endTime, organizer: currentUser.name })
+  });
+  const result = await res.json();
+
+  if(!res.ok) {
+    alert("Thất bại: " + result.error);
+  } else {
+    alert(result.message);
+    document.getElementById('meetTitle').value = '';
+    document.getElementById('meetStart').value = '';
+    document.getElementById('meetEnd').value = '';
+    loadRoomsData();
+  }
+}
+
+// CÁC HÀM UI KHÁC CHỮA ACCOUNT MANAGEMENT
+async function loadAccountsData() {
+  const res = await fetch('/api/users', { headers: { 'x-user-role': currentUser.role } });
+  const data = await res.json();
+  document.getElementById('tbody-accounts').innerHTML = data.map(u => `
+    <tr>
+      <td><b>${u.name}</b><br><small style="color:var(--slate)">${u.email}</small></td>
+      <td>${u.department}</td>
+      <td><span class="badge ${u.role==='Administrator'?'b-admin':u.role==='Meeting Manager'?'b-mgr':'b-emp'}">${u.role}</span></td>
+      <td>
+        <button class="action-btn" onclick="openEditModal('${u._id}', '${u.name}', '${u.department}', '${u.role}')">Sửa</button>
+        <button class="action-btn del" onclick="deleteUser('${u._id}')">Xóa</button>
+      </td>
+    </tr>
+  `).join('');
+}
+async function deleteUser(id) {
+  if(!confirm("Xóa nhân viên?")) return;
+  const res = await fetch(`/api/users/${id}`, { method: 'DELETE', headers: { 'x-user-role': currentUser.role } });
+  const result = await res.json();
+  alert(result.message);
+  loadAccountsData();
+}
+function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+function openCreateModal() {
+  isEditMode = false;
+  document.getElementById('modalTitle').innerText = "Tạo tài khoản mới";
+  document.getElementById('emailFieldGroup').style.display = "block";
+  document.getElementById('passwordFieldGroup').style.display = "block";
+  document.getElementById('newName').value = ''; document.getElementById('newEmail').value = ''; document.getElementById('newDept').value = '';
+  document.getElementById('overlay').classList.add('open');
+}
+function openEditModal(id, name, dept, role) {
+  isEditMode = true;
+  document.getElementById('modalTitle').innerText = "Chỉnh sửa thông tin";
+  document.getElementById('editUserId').value = id;
+  document.getElementById('newName').value = name; document.getElementById('newDept').value = dept; document.getElementById('newRole').value = role;
+  document.getElementById('emailFieldGroup').style.display = "none"; document.getElementById('passwordFieldGroup').style.display = "none";
+  document.getElementById('overlay').classList.add('open');
+}
+async function saveAccountAction() {
+  const name = document.getElementById('newName').value;
+  const department = document.getElementById('newDept').value;
+  const role = document.getElementById('newRole').value;
+  if(isEditMode) {
+    const id = document.getElementById('editUserId').value;
+    const res = await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-user-role': currentUser.role }, body: JSON.stringify({ name, department, role }) });
+    const result = await res.json(); alert(result.message); closeModal(); loadAccountsData();
+  } else {
+    const email = document.getElementById('newEmail').value; const password = document.getElementById('newPwd').value;
+    const res = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-user-role': currentUser.role }, body: JSON.stringify({ name, email, department, role, password }) });
+    const result = await res.json(); if(!res.ok) return alert(result.error); alert(result.message); closeModal(); loadAccountsData();
+  }
+}
+function handleLogout() { currentUser = null; document.getElementById('mainScreen').style.display = 'none'; document.getElementById('loginScreen').style.display = 'flex'; }
+</script>
+</body>
+</html>
